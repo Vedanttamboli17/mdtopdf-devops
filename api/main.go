@@ -57,7 +57,10 @@ func main() {
 
     fmt.Println("It's starting")
 
-    app.Static("/", "./public")
+    app.Get("/", func(c *fiber.Ctx) error {
+		c.Set("Content-Type", "text/html; charset=utf-8")
+		return c.Send(indexHTML)
+	})
 
     // Routes
     app.Post("/upload", handlers.Upload)
