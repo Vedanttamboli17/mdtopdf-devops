@@ -55,6 +55,8 @@ func main() {
         },
     }))
 
+    app.Static("/", "./public")
+
     // Routes
     app.Post("/upload", handlers.Upload)
     app.Get("/status/:file_id", handlers.Status)
