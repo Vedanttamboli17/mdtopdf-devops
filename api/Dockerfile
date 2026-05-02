@@ -14,7 +14,6 @@ FROM alpine:3.19
 RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /app/api .
-# COPY public/ ./public/
 
 EXPOSE 8080
 CMD ["./api"]
