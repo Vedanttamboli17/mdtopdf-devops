@@ -6,6 +6,7 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+    image: mdtopdf-api:latest
     container_name: mdtopdf-api
     ports:
       - "8080:8080"
@@ -22,6 +23,7 @@ services:
     build:
       context: ./worker
       dockerfile: Dockerfile
+    image: mdtopdf-worker:latest
     container_name: mdtopdf-worker
     env_file:
       - .env
