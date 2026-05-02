@@ -13,4 +13,8 @@ RUN apt-get update && \
     apt-get update && apt-get install -y docker-ce-cli && \
     rm -rf /var/lib/apt/lists/*
 
+# Create docker group with same GID as host and add jenkins to it
+RUN groupadd -f -g 988 docker && \
+    usermod -aG docker jenkins
+
 USER jenkins
