@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MD → PDF Converter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #06080f;
+        --surface: #0d1121;
+        --border: #1e2840;
+        --accent: #00e5a0;
+        --accent2: #0066ff;
+        --danger: #ff4560;
+        --text: #e8eaf0;
+        --muted: #5a6282;
+        --mono: "JetBrains Mono", monospace;
+        --sans: "Syne", sans-serif;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--mono);
+        overflow-x: hidden;
+      }
+
+      /* ── Grid Background ── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(0, 229, 160, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 229, 160, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── Glow blobs ── */
+      .blob {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(120px);
+        opacity: 0.18;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .blob-1 {
+        width: 500px;
+        height: 500px;
+        background: var(--accent);
+        top: -200px;
+        left: -100px;
+      }
+      .blob-2 {
+        width: 400px;
+        height: 400px;
+        background: var(--accent2);
+        bottom: -150px;
+        right: -100px;
+      }
+
+      /* ── Layout ── */
+      .shell {
+        position: relative;
+        z-index: 1;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 60px 20px 80px;
+      }
+
+      /* ── Header ── */
+      header {
+        text-align: center;
+        margin-bottom: 56px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(0, 229, 160, 0.08);
+        border: 1px solid rgba(0, 229, 160, 0.25);
+        border-radius: 100px;
+        padding: 6px 14px;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 20px;
+      }
+      .badge span {
+        width: 6px;
+        height: 6px;
+        background: var(--accent);
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.4;
+          transform: scale(1.4);
+        }
+      }
+
+      h1 {
+        font-family: var(--sans);
+        font-size: clamp(2.4rem, 6vw, 4.2rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+      }
+      h1 em {
+        font-style: normal;
+        color: var(--accent);
+      }
+      .sub {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 13px;
+        letter-spacing: 0.04em;
+      }
+
+      /* ── Card ── */
+      .card {
+        width: 100%;
+        max-width: 680px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 36px;
+        position: relative;
+        overflow: hidden;
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 229, 160, 0.04) 0%,
+          transparent 60%
+        );
+        pointer-events: none;
+      }
+
+      /* ── Drop Zone ── */
+      #drop-zone {
+        border: 2px dashed var(--border);
+        border-radius: 12px;
+        padding: 48px 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+        text-align: center;
+        position: relative;
+      }
+      #drop-zone:hover,
+      #drop-zone.drag-over {
+        border-color: var(--accent);
+        background: rgba(0, 229, 160, 0.04);
+      }
+      #drop-zone input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .drop-icon {
+        width: 52px;
+        height: 52px;
+        background: rgba(0, 229, 160, 0.1);
+        border: 1px solid rgba(0, 229, 160, 0.2);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        transition: transform 0.2s;
+      }
+      #drop-zone:hover .drop-icon {
+        transform: translateY(-3px);
+      }
+      .drop-title {
+        font-family: var(--sans);
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .drop-sub {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .drop-meta {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      /* ── File selected chip ── */
+      #file-chip {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        background: rgba(0, 229, 160, 0.07);
+        border: 1px solid rgba(0, 229, 160, 0.2);
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 13px;
+        margin-top: 16px;
+      }
+      #file-chip.show {
+        display: flex;
+      }
+      .chip-name {
+        flex: 1;
+        color: var(--accent);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chip-remove {
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        padding: 0;
+        transition: color 0.15s;
+      }
+      .chip-remove:hover {
+        color: var(--danger);
+      }
+
+      /* ── Submit button ── */
+      #upload-btn {
+        width: 100%;
+        margin-top: 20px;
+        padding: 14px;
+        border: none;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #000;
+        font-family: var(--sans);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition:
+          opacity 0.2s,
+          transform 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      #upload-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+      #upload-btn:not(:disabled):hover {
+        transform: translateY(-1px);
+        opacity: 0.92;
+      }
+
+      /* ── Pipeline Tracker ── */
+      #pipeline {
+        display: none;
+        margin-top: 28px;
+        gap: 0;
+        flex-direction: column;
+      }
+      #pipeline.show {
+        display: flex;
+      }
+
+      .pipe-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        position: relative;
+        padding-bottom: 24px;
+      }
+      .pipe-step:last-child {
+        padding-bottom: 0;
+      }
+      .pipe-step:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        left: 16px;
+        top: 34px;
+        bottom: 0;
+        width: 1px;
+        background: var(--border);
+      }
+      .pipe-step.done::after {
+        background: var(--accent);
+        opacity: 0.4;
+      }
+
+      .step-dot {
+        width: 33px;
+        height: 33px;
+        border-radius: 50%;
+        border: 1.5px solid var(--border);
+        background: var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        flex-shrink: 0;
+        transition: all 0.3s;
+        position: relative;
+        z-index: 1;
+      }
+      .pipe-step.active .step-dot {
+        border-color: var(--accent);
+        background: rgba(0, 229, 160, 0.12);
+        box-shadow: 0 0 0 4px rgba(0, 229, 160, 0.08);
+      }
+      .pipe-step.done .step-dot {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #000;
+      }
+      .pipe-step.failed .step-dot {
+        border-color: var(--danger);
+        background: rgba(255, 69, 96, 0.12);
+      }
+
+      /* Spinner inside dot */
+      .dot-spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(0, 229, 160, 0.3);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: none;
+      }
+      .pipe-step.active .dot-spinner {
+        display: block;
+      }
+      .pipe-step.active .dot-icon {
+        display: none;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .step-body {
+        flex: 1;
+        padding-top: 4px;
+      }
+      .step-label {
+        font-family: var(--sans);
+        font-size: 14px;
+        font-weight: 700;
+        transition: color 0.3s;
+      }
+      .pipe-step.active .step-label {
+        color: var(--accent);
+      }
+      .pipe-step.done .step-label {
+        color: var(--accent);
+      }
+      .pipe-step.failed .step-label {
+        color: var(--danger);
+      }
+      .step-desc {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 3px;
+        line-height: 1.5;
+      }
+
+      /* File ID monospace tag */
+      .step-tag {
+        display: inline-block;
+        margin-top: 6px;
+        background: rgba(0, 229, 160, 0.06);
+        border: 1px solid rgba(0, 229, 160, 0.15);
+        border-radius: 4px;
+        padding: 3px 8px;
+        font-size: 10px;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        word-break: break-all;
+      }
+
+      /* ── Download Block ── */
+      #download-block {
+        display: none;
+        margin-top: 28px;
+        background: rgba(0, 229, 160, 0.06);
+        border: 1px solid rgba(0, 229, 160, 0.2);
+        border-radius: 12px;
+        padding: 22px;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        text-align: center;
+        animation: fadeUp 0.4s ease;
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      #download-block.show {
+        display: flex;
+      }
+      .dl-icon {
+        font-size: 36px;
+        animation: bounce 0.6s ease;
+      }
+      @keyframes bounce {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-8px);
+        }
+      }
+      .dl-title {
+        font-family: var(--sans);
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--accent);
+      }
+      .dl-sub {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      #dl-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--accent);
+        color: #000;
+        font-family: var(--sans);
+        font-weight: 700;
+        font-size: 14px;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 28px;
+        cursor: pointer;
+        text-decoration: none;
+        transition:
+          opacity 0.2s,
+          transform 0.15s;
+      }
+      #dl-btn:hover {
+        opacity: 0.88;
+        transform: translateY(-1px);
+      }
+      #new-btn {
+        background: none;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+        border-radius: 6px;
+        padding: 8px 16px;
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          color 0.2s;
+      }
+      #new-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* ── Error Banner ── */
+      #error-banner {
+        display: none;
+        margin-top: 20px;
+        background: rgba(255, 69, 96, 0.08);
+        border: 1px solid rgba(255, 69, 96, 0.3);
+        border-radius: 10px;
+        padding: 14px 18px;
+        font-size: 12px;
+        color: var(--danger);
+        gap: 8px;
+        align-items: flex-start;
+      }
+      #error-banner.show {
+        display: flex;
+      }
+
+      /* ── Rate limit notice ── */
+      #rate-banner {
+        display: none;
+        margin-top: 20px;
+        background: rgba(255, 150, 0, 0.08);
+        border: 1px solid rgba(255, 150, 0, 0.3);
+        border-radius: 10px;
+        padding: 14px 18px;
+        font-size: 12px;
+        color: #ff9600;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      #rate-banner.show {
+        display: flex;
+      }
+
+      /* ── Info panel (architecture diagram) ── */
+      .info-panel {
+        width: 100%;
+        max-width: 680px;
+        margin-top: 24px;
+      }
+      details {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      summary {
+        padding: 16px 20px;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        user-select: none;
+        transition: color 0.2s;
+      }
+      summary:hover {
+        color: var(--text);
+      }
+      summary::after {
+        content: "▾";
+        margin-left: auto;
+        transition: transform 0.2s;
+      }
+      details[open] summary::after {
+        transform: rotate(180deg);
+      }
+      .arch-body {
+        padding: 0 20px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .arch-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+      }
+      .arch-row:hover {
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .arch-num {
+        width: 22px;
+        height: 22px;
+        background: rgba(0, 229, 160, 0.08);
+        border: 1px solid rgba(0, 229, 160, 0.2);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: var(--accent);
+        flex-shrink: 0;
+      }
+      .arch-svc {
+        color: var(--accent);
+        font-weight: 600;
+        min-width: 90px;
+      }
+      .arch-desc {
+        color: var(--muted);
+      }
+
+      /* ── Footer ── */
+      footer {
+        margin-top: 48px;
+        font-size: 11px;
+        color: var(--muted);
+        text-align: center;
+        letter-spacing: 0.06em;
+      }
+      footer span {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="shell">
+      <!-- Header -->
+      <header>
+        <div class="badge"><span></span> AWS Event-Driven System</div>
+        <h1>Markdown <em>→</em> PDF</h1>
+        <p class="sub">
+          Distributed microservices · Go + Fiber · S3 · SQS · DynamoDB
+        </p>
+      </header>
+
+      <!-- Main Card -->
+      <div class="card">
+        <!-- Drop Zone -->
+        <div id="drop-zone">
+          <input type="file" id="file-input" accept=".md" />
+          <div class="drop-icon">📄</div>
+          <div class="drop-title">Drop your Markdown file here</div>
+          <div class="drop-sub">or click to browse</div>
+          <div class="drop-meta">.md files only · max 5 MB</div>
+        </div>
+
+        <!-- File chip -->
+        <div id="file-chip">
+          <span>📎</span>
+          <span class="chip-name" id="chip-name">file.md</span>
+          <button class="chip-remove" id="chip-remove" title="Remove">✕</button>
+        </div>
+
+        <!-- Upload button -->
+        <button id="upload-btn" disabled>
+          <span id="btn-text">Select a file to convert</span>
+        </button>
+
+        <!-- Error / Rate banners -->
+        <div id="error-banner">⚠️ <span id="error-msg"></span></div>
+        <div id="rate-banner">
+          ⏳ Rate limit hit — max 5 uploads/min. Please wait a moment.
+        </div>
+
+        <!-- Pipeline Steps -->
+        <div id="pipeline">
+          <div class="pipe-step" id="step-upload">
+            <div class="step-dot">
+              <div class="dot-spinner"></div>
+              <div class="dot-icon">⬆</div>
+            </div>
+            <div class="step-body">
+              <div class="step-label">Uploading to S3</div>
+              <div class="step-desc">
+                Sending your Markdown file to Amazon S3
+              </div>
+            </div>
+          </div>
+          <div class="pipe-step" id="step-queue">
+            <div class="step-dot">
+              <div class="dot-spinner"></div>
+              <div class="dot-icon">⬡</div>
+            </div>
+            <div class="step-body">
+              <div class="step-label">Queued in SQS</div>
+              <div class="step-desc">Job message sent to Amazon SQS queue</div>
+              <div class="step-tag" id="file-id-tag"></div>
+            </div>
+          </div>
+          <div class="pipe-step" id="step-worker">
+            <div class="step-dot">
+              <div class="dot-spinner"></div>
+              <div class="dot-icon">⚙</div>
+            </div>
+            <div class="step-body">
+              <div class="step-label">Worker Processing</div>
+              <div class="step-desc">
+                Worker pulled job · converting MD → HTML → PDF
+              </div>
+            </div>
+          </div>
+          <div class="pipe-step" id="step-done">
+            <div class="step-dot">
+              <div class="dot-spinner"></div>
+              <div class="dot-icon">✓</div>
+            </div>
+            <div class="step-body">
+              <div class="step-label">PDF Ready</div>
+              <div class="step-desc">
+                PDF stored in S3 · presigned URL generated
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Download block -->
+        <div id="download-block">
+          <div class="dl-icon">🎉</div>
+          <div class="dl-title">Conversion Complete!</div>
+          <div class="dl-sub">Presigned URL expires in 10 minutes</div>
+          <a id="dl-btn" href="#" target="_blank" rel="noopener"
+            >⬇ Download PDF</a
+          >
+          <button id="new-btn">↩ Convert another file</button>
+        </div>
+      </div>
+      <!-- /card -->
+
+      <!-- Architecture Info -->
+      <div class="info-panel">
+        <details>
+          <summary>🏗 System Architecture</summary>
+          <div class="arch-body">
+            <div class="arch-row">
+              <div class="arch-num">1</div>
+              <div class="arch-svc">API Service</div>
+              <div class="arch-desc">
+                Go + Fiber validates file, uploads to S3, creates DynamoDB job,
+                sends SQS message
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-num">2</div>
+              <div class="arch-svc">Amazon S3</div>
+              <div class="arch-desc">
+                Stores raw Markdown (uploads/) and generated PDFs (pdfs/) with
+                private access
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-num">3</div>
+              <div class="arch-svc">DynamoDB</div>
+              <div class="arch-desc">
+                Tracks job metadata: status, input_url, output_url, retry_count
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-num">4</div>
+              <div class="arch-svc">Amazon SQS</div>
+              <div class="arch-desc">
+                Decouples API from Worker. Long-polling, DLQ after 3 retries,
+                20s visibility
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-num">5</div>
+              <div class="arch-svc">Worker</div>
+              <div class="arch-desc">
+                Polls SQS, downloads MD, converts via wkhtmltopdf, uploads PDF,
+                updates DynamoDB
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-num">6</div>
+              <div class="arch-svc">Presigned URL</div>
+              <div class="arch-desc">
+                S3 presigned URL gives temporary 10-min access. PDF never
+                publicly exposed
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <footer>
+        Built with
+        <span>Go · Fiber · Docker · Terraform · Ansible · Jenkins</span> · AWS
+        Free Tier
+      </footer>
+    </div>
+    <!-- /shell -->
+
+    <script>
+      // ── State ──────────────────────────────────────────────────────────────
+      let selectedFile = null;
+      let pollInterval = null;
+      let currentFileId = null;
+
+      // ── Elements ───────────────────────────────────────────────────────────
+      const dropZone = document.getElementById("drop-zone");
+      const fileInput = document.getElementById("file-input");
+      const fileChip = document.getElementById("file-chip");
+      const chipName = document.getElementById("chip-name");
+      const chipRemove = document.getElementById("chip-remove");
+      const uploadBtn = document.getElementById("upload-btn");
+      const btnText = document.getElementById("btn-text");
+      const pipeline = document.getElementById("pipeline");
+      const dlBlock = document.getElementById("download-block");
+      const dlBtn = document.getElementById("dl-btn");
+      const newBtn = document.getElementById("new-btn");
+      const errorBanner = document.getElementById("error-banner");
+      const errorMsg = document.getElementById("error-msg");
+      const rateBanner = document.getElementById("rate-banner");
+      const fileIdTag = document.getElementById("file-id-tag");
+
+      const steps = {
+        upload: document.getElementById("step-upload"),
+        queue: document.getElementById("step-queue"),
+        worker: document.getElementById("step-worker"),
+        done: document.getElementById("step-done"),
+      };
+
+      // ── File Selection ─────────────────────────────────────────────────────
+      fileInput.addEventListener("change", (e) => setFile(e.target.files[0]));
+
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("drag-over");
+      });
+      dropZone.addEventListener("dragleave", () =>
+        dropZone.classList.remove("drag-over"),
+      );
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+        const file = e.dataTransfer.files[0];
+        if (file) setFile(file);
+      });
+
+      chipRemove.addEventListener("click", (e) => {
+        e.stopPropagation();
+        resetFile();
+      });
+
+      function setFile(file) {
+        if (!file) return;
+        if (!file.name.endsWith(".md")) {
+          showError("Only .md (Markdown) files are accepted.");
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          showError("File too large — max 5 MB allowed.");
+          return;
+        }
+        selectedFile = file;
+        chipName.textContent = file.name;
+        fileChip.classList.add("show");
+        uploadBtn.disabled = false;
+        btnText.textContent = `Convert "${file.name}" to PDF`;
+        hideError();
+      }
+
+      function resetFile() {
+        selectedFile = null;
+        fileInput.value = "";
+        fileChip.classList.remove("show");
+        uploadBtn.disabled = true;
+        btnText.textContent = "Select a file to convert";
+      }
+
+      // ── Upload ─────────────────────────────────────────────────────────────
+      uploadBtn.addEventListener("click", startUpload);
+
+      async function startUpload() {
+        if (!selectedFile) return;
+        hideError();
+        rateBanner.classList.remove("show");
+
+        // Lock UI
+        uploadBtn.disabled = true;
+        btnText.textContent = "⏳ Uploading...";
+        dropZone.style.pointerEvents = "none";
+        chipRemove.style.display = "none";
+
+        // Show pipeline
+        pipeline.classList.add("show");
+        setStep("upload", "active");
+
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+
+        try {
+          const res = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (res.status === 429) {
+            rateBanner.classList.add("show");
+            resetToIdle();
+            return;
+          }
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            showError(
+              data.error ||
+                "Upload failed. Check that the API service is running.",
+            );
+            resetToIdle();
+            return;
+          }
+
+          currentFileId = data.file_id;
+          fileIdTag.textContent = `job_id: ${currentFileId}`;
+
+          setStep("upload", "done");
+          setStep("queue", "done");
+          setStep("worker", "active");
+          btnText.textContent = "⚙ Processing...";
+
+          // Start polling
+          pollInterval = setInterval(pollStatus, 2500);
+        } catch (err) {
+          showError("Network error — is the API reachable? " + err.message);
+          resetToIdle();
+        }
+      }
+
+      // ── Status Polling ─────────────────────────────────────────────────────
+      async function pollStatus() {
+        if (!currentFileId) return;
+        try {
+          const res = await fetch(`/status/${currentFileId}`);
+          const data = await res.json();
+
+          if (data.status === "completed") {
+            clearInterval(pollInterval);
+            setStep("worker", "done");
+            setStep("done", "done");
+            showDownload(data.download_url);
+          } else if (data.status === "failed") {
+            clearInterval(pollInterval);
+            setStep("worker", "failed");
+            setStep("done", "failed");
+            showError(
+              "Conversion failed after max retries. Check worker logs.",
+            );
+            uploadBtn.disabled = false;
+            btnText.textContent = "Try Again";
+          }
+          // else still "processing" — keep polling
+        } catch (err) {
+          console.warn("Poll error:", err);
+        }
+      }
+
+      // ── Download ───────────────────────────────────────────────────────────
+      function showDownload(url) {
+        dlBtn.href = url;
+        dlBlock.classList.add("show");
+        uploadBtn.style.display = "none";
+      }
+
+      newBtn.addEventListener("click", () => {
+        clearInterval(pollInterval);
+        currentFileId = null;
+
+        // Reset all steps
+        Object.values(steps).forEach((s) => (s.className = "pipe-step"));
+        pipeline.classList.remove("show");
+        dlBlock.classList.remove("show");
+        uploadBtn.style.display = "";
+        dropZone.style.pointerEvents = "";
+        chipRemove.style.display = "";
+        resetFile();
+        hideError();
+        rateBanner.classList.remove("show");
+      });
+
+      // ── Helpers ────────────────────────────────────────────────────────────
+      function setStep(name, state) {
+        steps[name].className = `pipe-step ${state}`;
+      }
+
+      function resetToIdle() {
+        pipeline.classList.remove("show");
+        Object.values(steps).forEach((s) => (s.className = "pipe-step"));
+        uploadBtn.disabled = false;
+        uploadBtn.style.display = "";
+        btnText.textContent = selectedFile
+          ? `Convert "${selectedFile.name}" to PDF`
+          : "Select a file to convert";
+        dropZone.style.pointerEvents = "";
+        chipRemove.style.display = "";
+      }
+
+      function showError(msg) {
+        errorMsg.textContent = msg;
+        errorBanner.classList.add("show");
+      }
+
+      function hideError() {
+        errorBanner.classList.remove("show");
+      }
+    </script>
+  </body>
+</html>

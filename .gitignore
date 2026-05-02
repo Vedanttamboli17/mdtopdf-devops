@@ -14,5 +14,4 @@ worker/worker
 
 # Temp files
 *.pdf
-*.html
 /tmp/
