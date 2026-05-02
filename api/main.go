@@ -4,6 +4,7 @@ import (
     "log/slog"
     "os"
     "time"
+    "fmt"
 
     "github.com/gofiber/fiber/v2"
     "github.com/gofiber/fiber/v2/middleware/limiter"
@@ -35,7 +36,6 @@ func main() {
         AppName: "mdtopdf-api",
     })
 
-    // Structured request logging
     app.Use(logger.New(logger.Config{
         Format: `{"time":"${time}","status":${status},"method":"${method}","path":"${path}","ip":"${ip}"}` + "\n",
     }))
@@ -54,6 +54,8 @@ func main() {
             })
         },
     }))
+
+    fmt.Println("It's starting")
 
     app.Static("/", "./public")
 
