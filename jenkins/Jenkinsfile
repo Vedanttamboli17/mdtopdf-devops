@@ -33,32 +33,6 @@ pipeline {
             }
         }
 
-        // stage('Save & Transfer Images') {
-        //     steps {
-        //         withCredentials([
-        //             sshUserPrivateKey(credentialsId: env.SSH_KEY_ID, keyFileVariable: 'SSH_KEY'),
-        //             string(credentialsId: env.EC2_IP_ID, variable: 'EC2_IP'),
-        //             file(credentialsId: env.ENV_FILE_ID, variable: 'ENV_FILE')
-        //         ]) {
-        //             sh '''
-        //                 echo "📦 Saving images..."
-        //                 docker save mdtopdf-api:latest    | gzip > api.tar.gz
-        //                 docker save mdtopdf-worker:latest | gzip > worker.tar.gz
-
-        //                 echo "🚀 Transferring to EC2..."
-        //                 scp -i $SSH_KEY -o StrictHostKeyChecking=no \
-        //                     api.tar.gz worker.tar.gz docker-compose.yml $ENV_FILE \
-        //                     ${EC2_USER}@${EC2_IP}:${APP_DIR}/
-
-        //                 echo "🔧 Renaming .env on EC2..."
-        //                 ssh -i $SSH_KEY -o StrictHostKeyChecking=no \
-        //                     ${EC2_USER}@${EC2_IP} \
-        //                     "mv ${APP_DIR}/$(basename $ENV_FILE) ${APP_DIR}/.env && chmod 600 ${APP_DIR}/.env"
-        //             '''
-        //         }
-        //     }
-        // }
-
         stage('Save & Transfer Images') {
             steps {
                 withCredentials([
@@ -93,19 +67,20 @@ pipeline {
                     sh """
                         ssh -i \$SSH_KEY -o StrictHostKeyChecking=no \
                             \${EC2_USER}@\${EC2_IP} bash << 'REMOTE'
-                            set -e
-                            cd ${APP_DIR}
+                        set -e
+                        cd /home/ubuntu/DevOps_Project
 
-                            echo "⏬ Loading new Docker images..."
-                            docker load < api.tar.gz
-                            docker load < worker.tar.gz
+                        echo "⏬ Loading new Docker images..."
+                        docker load < api.tar.gz
+                        docker load < worker.tar.gz
 
-                            echo "🔄 Restarting services..."
-                            docker compose down --remove-orphans
-                            docker compose up -d api worker
+                        echo "🔄 Restarting services..."
+                        docker compose stop api worker
+                        docker compose rm -f api worker
+                        docker compose up -d api worker
 
-                            echo "🧹 Cleaning up tarballs..."
-                            rm -f api.tar.gz worker.tar.gz
+                        echo "🧹 Cleaning up tarballs..."
+                        rm -f api.tar.gz worker.tar.gz
 REMOTE
                     """
                 }
