@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: mdtopdf-api
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: mdtopdf-worker
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    container_name: mdtopdf-jenkins
+    ports:
+      - "8081:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock  # Share Docker daemon
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:

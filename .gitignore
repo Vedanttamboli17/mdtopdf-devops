@@ -1,0 +1,18 @@
+# Environment
+.env
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/.terraform.lock.hcl
+
+# Build artifacts
+*.tar.gz
+api/api
+worker/worker
+
+# Temp files
+*.pdf
+*.html
+/tmp/

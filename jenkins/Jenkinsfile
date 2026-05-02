@@ -1,0 +1,108 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_DIR     = '/home/ubuntu/mdtopdf'
+        EC2_USER    = 'ubuntu'
+        SSH_KEY_ID  = 'ec2-ssh-key'   // Jenkins credential ID
+        EC2_IP_ID   = 'ec2-ip'        // Jenkins credential ID
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+                echo "✅ Code checked out from branch: ${env.BRANCH_NAME}"
+            }
+        }
+
+        stage('Build Images') {
+            parallel {
+                stage('Build API') {
+                    steps {
+                        sh 'docker build -t mdtopdf-api:latest ./api'
+                    }
+                }
+                stage('Build Worker') {
+                    steps {
+                        sh 'docker build -t mdtopdf-worker:latest ./worker'
+                    }
+                }
+            }
+        }
+
+        stage('Save & Transfer Images') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: env.SSH_KEY_ID, keyFileVariable: 'SSH_KEY'),
+                    string(credentialsId: env.EC2_IP_ID, variable: 'EC2_IP')
+                ]) {
+                    sh '''
+                        echo "📦 Saving images..."
+                        docker save mdtopdf-api:latest   | gzip > api.tar.gz
+                        docker save mdtopdf-worker:latest | gzip > worker.tar.gz
+
+                        echo "🚀 Transferring to EC2..."
+                        scp -i $SSH_KEY -o StrictHostKeyChecking=no \
+                            api.tar.gz worker.tar.gz docker-compose.yml .env \
+                            ${EC2_USER}@${EC2_IP}:${APP_DIR}/
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy on EC2') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: env.SSH_KEY_ID, keyFileVariable: 'SSH_KEY'),
+                    string(credentialsId: env.EC2_IP_ID, variable: 'EC2_IP')
+                ]) {
+                    sh '''
+                        ssh -i $SSH_KEY -o StrictHostKeyChecking=no \
+                            ${EC2_USER}@${EC2_IP} << 'REMOTE'
+                            cd ''' + APP_DIR + '''
+                            echo "⏬ Loading new Docker images..."
+                            docker load < api.tar.gz
+                            docker load < worker.tar.gz
+
+                            echo "🔄 Restarting services..."
+                            docker compose down --remove-orphans
+                            docker compose up -d api worker
+
+                            echo "🧹 Cleaning up tarballs..."
+                            rm -f api.tar.gz worker.tar.gz
+REMOTE
+                    '''
+                }
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                withCredentials([string(credentialsId: env.EC2_IP_ID, variable: 'EC2_IP')]) {
+                    sh '''
+                        echo "🏥 Waiting for API to come up..."
+                        sleep 10
+                        curl -sf http://${EC2_IP}:8080/health && \
+                            echo "✅ API is healthy!" || \
+                            (echo "❌ Health check failed!" && exit 1)
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'rm -f api.tar.gz worker.tar.gz || true'
+            echo "Pipeline finished: ${currentBuild.currentResult}"
+        }
+        success {
+            echo "🎉 Deployment successful!"
+        }
+        failure {
+            echo "🚨 Pipeline failed — check logs above"
+        }
+    }
+}
