@@ -9,14 +9,10 @@ import (
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/sqs"
+    "github.com/docplatform/shared/queue"
 )
 
 var sqsClient *sqs.Client
-
-type SQSMessage struct {
-    FileID string `json:"file_id"`
-    S3Key  string `json:"s3_key"`
-}
 
 func InitSQS() error {
     cfg, err := config.LoadDefaultConfig(context.TODO(),
@@ -29,14 +25,18 @@ func InitSQS() error {
     return nil
 }
 
-func SendMessage(msg SQSMessage) error {
-    body, err := json.Marshal(msg)
-    if err != nil {
-        return fmt.Errorf("marshal failed: %w", err)
-    }
-    _, err = sqsClient.SendMessage(context.TODO(), &sqs.SendMessageInput{
-        QueueUrl:    aws.String(os.Getenv("SQS_QUEUE_URL")),
-        MessageBody: aws.String(string(body)),
-    })
-    return err
+func SendMessage(msg queue.JobMessage) error {
+	return SendMessageToURL(os.Getenv("SQS_QUEUE_URL"), msg)
+}
+
+func SendMessageToURL(queueURL string, msg queue.JobMessage) error {
+	body, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("marshal failed: %w", err)
+	}
+	_, err = sqsClient.SendMessage(context.TODO(), &sqs.SendMessageInput{
+		QueueUrl:    aws.String(queueURL),
+		MessageBody: aws.String(string(body)),
+	})
+	return err
 }

@@ -1,50 +1,97 @@
-version: '3.8'
-
 services:
 
   api:
     build:
-      context: ./api
-      dockerfile: Dockerfile
-    image: mdtopdf-api:latest
-    container_name: mdtopdf-api
+      context: .
+      dockerfile: api/Dockerfile
+    image: docplatform-api:latest
+    container_name: docplatform-api
     ports:
       - "8080:8080"
-    env_file:
-      - .env
+    env_file: .env
     restart: unless-stopped
+    depends_on:
+      - prometheus
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
 
-  worker:
+  worker-md:
     build:
-      context: ./worker
-      dockerfile: Dockerfile
-    image: mdtopdf-worker:latest
-    container_name: mdtopdf-worker
-    env_file:
-      - .env
+      context: .
+      dockerfile: worker-md/Dockerfile
+    image: docplatform-worker-md:latest
+    container_name: docplatform-worker-md
+    ports:
+      - "9091:9090"   # metrics
+    env_file: .env
     restart: unless-stopped
+
+  worker-docx:
+    build:
+      context: .
+      dockerfile: worker-docx/Dockerfile
+    image: docplatform-worker-docx:latest
+    container_name: docplatform-worker-docx
+    ports:
+      - "9092:9090"   # metrics
+    env_file: .env
+    restart: unless-stopped
+
+  worker-thumb:
+    build:
+      context: .
+      dockerfile: worker-thumb/Dockerfile
+    image: docplatform-worker-thumb:latest
+    container_name: docplatform-worker-thumb
+    ports:
+      - "9093:9090"   # metrics
+    env_file: .env
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: docplatform-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: docplatform-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
-      - api
+      - prometheus
+    restart: unless-stopped
 
   jenkins:
     build:
       context: ./jenkins
       dockerfile: Dockerfile
-    container_name: mdtopdf-jenkins
+    image: docplatform-jenkins:latest
+    container_name: docplatform-jenkins
     ports:
       - "8081:8080"
       - "50000:50000"
     volumes:
       - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock  # Share Docker daemon
-    group_add: 
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
       - "988"
     restart: unless-stopped
 
 volumes:
+  grafana_data:
   jenkins_home:

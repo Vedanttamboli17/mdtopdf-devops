@@ -38,7 +38,19 @@ resource "aws_iam_role_policy" "ec2_policy" {
           "dynamodb:PutItem",
           "dynamodb:UpdateItem"
         ]
-        Resource = aws_dynamodb_table.jobs.arn
+        Resource = [
+          aws_dynamodb_table.jobs.arn,
+          aws_dynamodb_table.tenants.arn
+        ]
+      },
+      {
+        Sid    = "DynamoDBTenantScan"
+        Effect = "Allow"
+        # worker-thumb resolves a tenant by tenant_id to fetch its webhook secret,
+        # but the tenants table is keyed by api_key — so it uses a filtered Scan.
+        # Scoped to the tenants table only (never the jobs table, which is unbounded).
+        Action   = ["dynamodb:Scan"]
+        Resource = aws_dynamodb_table.tenants.arn
       },
       {
         Sid    = "SQSAccess"
@@ -49,7 +61,29 @@ resource "aws_iam_role_policy" "ec2_policy" {
           "sqs:DeleteMessage",
           "sqs:GetQueueAttributes"
         ]
-        Resource = aws_sqs_queue.main.arn
+        Resource = [
+          aws_sqs_queue.main.arn,
+          aws_sqs_queue.docx_queue.arn,
+          aws_sqs_queue.thumb_queue.arn,
+          aws_sqs_queue.notification_queue.arn
+        ]
+      },
+      {
+        Sid    = "SSMAccess"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ]
+        # Scoped to the /docplatform/ path — instances cannot read unrelated parameters
+        Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/docplatform/*"
+      },
+      {
+        Sid      = "AutoScalingAccess"
+        Effect   = "Allow"
+        Action   = ["autoscaling:*"]
+        Resource = "*"
       }
     ]
   })

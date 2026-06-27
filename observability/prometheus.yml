@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'api'
+    static_configs:
+      - targets: ['api:8080']
+    metrics_path: '/metrics'
+
+  - job_name: 'worker-md'
+    static_configs:
+      - targets: ['worker-md:9090']
+
+  - job_name: 'worker-docx'
+    static_configs:
+      - targets: ['worker-docx:9090']
+
+  - job_name: 'worker-thumb'
+    static_configs:
+      - targets: ['worker-thumb:9090']

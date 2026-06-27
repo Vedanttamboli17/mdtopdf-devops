@@ -1,0 +1,18 @@
+# Keep the build context small and free of secrets/state.
+.git/
+.gitignore
+.env
+*.tar.gz
+**/*.pdf
+
+# Not needed to compile any service image
+terraform/
+ansible/
+observability/
+jenkins/
+notification-svc/
+
+# Workspace file is intentionally excluded — images build in module mode
+# (GOWORK=off) via the `replace` directive, not via the workspace.
+go.work
+go.work.sum

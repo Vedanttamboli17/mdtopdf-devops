@@ -1,0 +1,10 @@
+go 1.25.3
+
+use (
+	./api
+	./notification-svc
+	./shared
+	./worker-docx
+	./worker-md
+	./worker-thumb
+)

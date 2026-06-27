@@ -10,7 +10,7 @@ import (
     "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-    "mdtopdf/api/models"
+    "github.com/docplatform/shared/models"
 )
 
 var dbClient *dynamodb.Client

@@ -115,20 +115,8 @@
         owner: ubuntu
         mode: '0600'
 
-    - name: Build api service
-      shell: docker compose build api
-      args:
-        chdir: "{{ app_dir }}"
-      become: no
-
-    - name: Build worker service
-      shell: docker compose build worker
-      args:
-        chdir: "{{ app_dir }}"
-      become: no
-
-    - name: Build jenkins service
-      shell: docker compose build jenkins
+    - name: Build all application images (api, worker-md, worker-docx, worker-thumb, jenkins)
+      shell: docker compose build
       args:
         chdir: "{{ app_dir }}"
       become: no

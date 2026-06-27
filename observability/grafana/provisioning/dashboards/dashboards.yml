@@ -1,0 +1,14 @@
+apiVersion: 1
+
+providers:
+  - name: docplatform
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      # JSON dashboards are mounted here (see docker-compose.yml)
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

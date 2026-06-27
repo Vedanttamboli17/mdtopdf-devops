@@ -19,15 +19,28 @@ pipeline {
         }
 
         stage('Build Images') {
+            // All images build from the REPO ROOT (.) so the workspace-shared
+            // Go module is in the build context; the per-service Dockerfile is
+            // selected with -f.
             parallel {
-                stage('Build API') {
+                stage('API') {
                     steps {
-                        sh 'docker build -t mdtopdf-api:latest ./api'
+                        sh 'docker build -t docplatform-api:latest          -f api/Dockerfile .'
                     }
                 }
-                stage('Build Worker') {
+                stage('Worker MD') {
                     steps {
-                        sh 'docker build -t mdtopdf-worker:latest ./worker'
+                        sh 'docker build -t docplatform-worker-md:latest    -f worker-md/Dockerfile .'
+                    }
+                }
+                stage('Worker DOCX') {
+                    steps {
+                        sh 'docker build -t docplatform-worker-docx:latest  -f worker-docx/Dockerfile .'
+                    }
+                }
+                stage('Worker Thumb') {
+                    steps {
+                        sh 'docker build -t docplatform-worker-thumb:latest -f worker-thumb/Dockerfile .'
                     }
                 }
             }
@@ -42,12 +55,20 @@ pipeline {
                 ]) {
                     sh '''
                         echo "📦 Saving images..."
-                        docker save mdtopdf-api:latest    | gzip > api.tar.gz
-                        docker save mdtopdf-worker:latest | gzip > worker.tar.gz
+                        docker save docplatform-api:latest          | gzip > api.tar.gz
+                        docker save docplatform-worker-md:latest    | gzip > worker-md.tar.gz
+                        docker save docplatform-worker-docx:latest  | gzip > worker-docx.tar.gz
+                        docker save docplatform-worker-thumb:latest | gzip > worker-thumb.tar.gz
 
-                        echo "🚀 Transferring to EC2..."
+                        echo "🚀 Transferring images + compose + observability config to EC2..."
+                        ssh -i $SSH_KEY -o StrictHostKeyChecking=no \
+                            ${EC2_USER}@${EC2_IP} "mkdir -p ${APP_DIR}"
                         scp -i $SSH_KEY -o StrictHostKeyChecking=no \
-                            api.tar.gz worker.tar.gz docker-compose.yml \
+                            api.tar.gz worker-md.tar.gz worker-docx.tar.gz worker-thumb.tar.gz \
+                            docker-compose.yml \
+                            ${EC2_USER}@${EC2_IP}:${APP_DIR}/
+                        scp -i $SSH_KEY -o StrictHostKeyChecking=no -r \
+                            observability \
                             ${EC2_USER}@${EC2_IP}:${APP_DIR}/
 
                         echo "🔧 Copying .env to EC2..."
@@ -72,15 +93,19 @@ pipeline {
 
                         echo "⏬ Loading new Docker images..."
                         docker load < api.tar.gz
-                        docker load < worker.tar.gz
+                        docker load < worker-md.tar.gz
+                        docker load < worker-docx.tar.gz
+                        docker load < worker-thumb.tar.gz
 
-                        echo "🔄 Restarting services..."
-                        docker compose stop api worker
-                        docker compose rm -f api worker
-                        docker compose up -d api worker
+                        echo "🔄 Restarting application services..."
+                        docker compose stop  api worker-md worker-docx worker-thumb
+                        docker compose rm -f api worker-md worker-docx worker-thumb
+                        # Brings the four app services back up; depends_on also
+                        # ensures prometheus is running.
+                        docker compose up -d api worker-md worker-docx worker-thumb
 
                         echo "🧹 Cleaning up tarballs..."
-                        rm -f api.tar.gz worker.tar.gz
+                        rm -f api.tar.gz worker-md.tar.gz worker-docx.tar.gz worker-thumb.tar.gz
 REMOTE
                     """
                 }
@@ -104,7 +129,7 @@ REMOTE
 
     post {
         always {
-            sh 'rm -f api.tar.gz worker.tar.gz || true'
+            sh 'rm -f api.tar.gz worker-md.tar.gz worker-docx.tar.gz worker-thumb.tar.gz || true'
             echo "Pipeline finished: ${currentBuild.currentResult}"
         }
         success {
