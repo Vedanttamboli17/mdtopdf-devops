@@ -2,19 +2,22 @@
 #   docker build -t docplatform-worker-md:latest -f worker-md/Dockerfile .
 #
 # ── Stage 1: Build ─────────────────────────────────────────────
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.3 AS builder
+
 ENV GOWORK=off
 WORKDIR /src
 
-# worker-md/go.mod carries `replace github.com/docplatform/shared => ../shared`,
-# so shared/go.mod must be present for dependency resolution.
 COPY shared/go.mod shared/go.sum ./shared/
 COPY worker-md/go.mod worker-md/go.sum ./worker-md/
+
 RUN cd worker-md && go mod download
 
 COPY shared/ ./shared/
 COPY worker-md/ ./worker-md/
-RUN cd worker-md && CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /out/worker .
+
+RUN mkdir -p /out && \
+    cd worker-md && \
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /out/worker .
 
 # ── Stage 2: Run (needs wkhtmltopdf) ───────────────────────────
 FROM debian:bullseye-slim

@@ -2,7 +2,7 @@
 #   docker build -t docplatform-worker-thumb:latest -f worker-thumb/Dockerfile .
 #
 # ── Stage 1: Build ─────────────────────────────────────────────
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.3 AS builder
 ENV GOWORK=off
 WORKDIR /src
 
